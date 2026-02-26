@@ -1,6 +1,5 @@
 #building the api
 from fastapi import FastAPI
-from pydantic import BaseModel
 from .schemas import NoteInput
 from .models.database import DBSession
 from .models.model import model
@@ -12,10 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 #app instance creation
 app = FastAPI()
-
-class NoteInput(BaseModel):
-    title:str = ''
-    noteBody:str = ''
 
 '''defining the api routes
 1.Create
@@ -107,7 +102,7 @@ def delete_note(note_id:int):
     }
 
 #CORS
-origins = ["http://localhost:5173"]
+origins = ["http://localhost:3000"]
 
 #defining the middleware and the methods related to it
 app.add_middleware(
