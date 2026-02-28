@@ -1,10 +1,8 @@
 #building the api
-from fastapi import FastAPI
-from .schemas import NoteInput
-from .models.database import DBSession
-from .models.model import model
-from fastapi.exceptions import HTTPException
-
+from fastapi import FastAPI, HTTPException
+from schemas import NoteInput
+from model.database import DBSession
+from model import models
 from sqlalchemy.orm.exc import UnmappedInstanceError
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,7 +22,7 @@ app = FastAPI()
 def read_notes():    
     db = DBSession()#database instance to query all the entries
     try:
-        notes=db.query(model.Note).all()
+        notes=db.query(models.Note).all()
     finally:
         db.close() #db should close regardless of request succeeding/not
     return notes #returns notes as the HTTP GET response of the API route  
@@ -41,7 +39,7 @@ def add_note(note:NoteInput):
                     "status":"Error 400 - Bad Request",
                     "message":"Both 'title' and 'noteBody' are empty" 
                 })
-        new_note = model.Note(title = note.title, note_body=note.noteBody)
+        new_note = models.Note(title = note.title, note_body=note.noteBody)
         db.add(new_note)
         db.commit()
         db.refresh(new_note)
@@ -70,27 +68,37 @@ def update_note(note_id:int,updated_note:NoteInput):
                 "message":"The note's 'title' and 'noteBody' can't be both empty"
             })
     try:
-        note = db.query(model.Note).filter(model.Note.id == note_id)
-        note.title = updated_note.title
-        note.noteBody = updated_note.noteBody
+        note_obj = db.query(models.Note).filter(models.Note.id == note_id).first()
+        if not note_obj:
+            raise HTTPException(status_code=404, detail={
+                "status": "Error 404 - Not Found",
+                "message": f"Note with id '{note_id}' does not exist."
+            })
+        note_obj.title = updated_note.title
+        note_obj.note_body = updated_note.noteBody
         db.commit()
-        db.refresh(note)
+        db.refresh(note_obj)
     finally:
         db.close()
-    return note        
+    return note_obj        
 
 #deleting a note
 @app.delete("/note/{note_id}")
 def delete_note(note_id:int):
     db=DBSession()
     try:
-        note = db.query(model.Note).filter(model.Note.id == note_id)
-        db.delete(note)
+        note_obj = db.query(models.Note).filter(models.Note.id == note_id).first()
+        if not note_obj:
+            raise HTTPException(status_code=404, detail={
+                "status": "Error 404 - Not Found",
+                "message": f"Note with id '{note_id}' does not exist."
+            })
+        db.delete(note_obj)
         db.commit()
     except UnmappedInstanceError:
-        raise HTTPException(status_code=400, detail={ #type:ignore
-            "status": "Error 400 - Bad Request" 
-            "message":f"Note with 'id':'{note_id}' does not exist."
+        raise HTTPException(status_code=400, detail={ 
+            "status": "Error 400 - Bad Request", 
+            "message" : f"Note with id '{note_id}' could not be deleted."
         })
 
     finally:
@@ -112,6 +120,4 @@ app.add_middleware(
     allow_methods = ["*"], # '*' = allow all 
     allow_headers = ["*"]
 )
-
-
 
